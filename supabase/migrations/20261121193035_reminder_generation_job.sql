@@ -250,8 +250,8 @@ revoke all on function public.run_reminder_generation() from public;
 -- ============================================================
 create extension if not exists pg_cron with schema extensions;
 
-select extensions.cron.schedule(
+select cron.schedule(
   'daily-reminder-generation',
-  '0 4 * * *',  -- 04:00 UTC ≈ 09:00 Asia/Karachi
+  '0 4 * * *',
   $$select public.run_reminder_generation();$$
 );

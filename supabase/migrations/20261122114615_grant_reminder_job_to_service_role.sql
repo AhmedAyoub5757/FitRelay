@@ -1,0 +1,1 @@
+grant execute on function public.run_reminder_generation() to service_role;
