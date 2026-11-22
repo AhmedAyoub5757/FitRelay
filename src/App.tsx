@@ -12,6 +12,7 @@ import PaymentsPage from './pages/PaymentsPage'
 import RemindersPage from './pages/RemindersPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
+import MemberDetailPage from './pages/MemberDetailPage'
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
           <Route path="/app" element={<AppLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="members" element={<MembersPage />} />
+            <Route path="members/:memberId" element={<MemberDetailPage />} />
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="reminders" element={<RemindersPage />} />
             <Route path="reports" element={<ReportsPage />} />

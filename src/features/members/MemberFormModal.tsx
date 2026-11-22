@@ -1,106 +1,107 @@
-
-import { useState, useMemo, type FormEvent } from 'react'
-import { Modal } from '../../components/Modal'
-import { normalizePhone } from '../../lib/phone'
-import { useMembershipPlans, useDuplicateCheck, useRegisterMember } from './queries'
+import { useState, useMemo, type FormEvent } from "react";
+import { Modal } from "../../components/Modal";
+import { normalizePhone } from "../../lib/phone";
+import {
+  useMembershipPlans,
+  useDuplicateCheck,
+  useRegisterMember,
+} from "./queries";
+import { UserPlus } from "lucide-react";
 
 export function MemberFormModal({
   open,
   onClose,
 }: {
-  open: boolean
-  onClose: () => void
+  open: boolean;
+  onClose: () => void;
 }) {
-  const [fullName, setFullName] = useState('')
-  const [phoneInput, setPhoneInput] = useState('')
-  const [emergencyName, setEmergencyName] = useState('')
-  const [emergencyPhone, setEmergencyPhone] = useState('')
-  const [planId, setPlanId] = useState('')
-  const [durationDays, setDurationDays] = useState(30)
-  const [grossAmount, setGrossAmount] = useState(0)
-  const [discountAmount, setDiscountAmount] = useState(0)
-  const [initialPayment, setInitialPayment] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState('cash')
-  const [error, setError] = useState<string | null>(null)
+  const [fullName, setFullName] = useState("");
+  const [phoneInput, setPhoneInput] = useState("");
+  const [emergencyName, setEmergencyName] = useState("");
+  const [emergencyPhone, setEmergencyPhone] = useState("");
+  const [planId, setPlanId] = useState("");
+  const [durationDays, setDurationDays] = useState(30);
+  const [grossAmount, setGrossAmount] = useState(0);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [initialPayment, setInitialPayment] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [error, setError] = useState<string | null>(null);
 
-  const { data: plans } = useMembershipPlans()
-  const registerMember = useRegisterMember()
+  const { data: plans } = useMembershipPlans();
+  const registerMember = useRegisterMember();
 
-  const phoneResult = useMemo(
-    () => normalizePhone(phoneInput),
-    [phoneInput],
-  )
+  const phoneResult = useMemo(() => normalizePhone(phoneInput), [phoneInput]);
 
-  const { data: duplicates } = useDuplicateCheck(phoneResult.normalized)
+  const { data: duplicates } = useDuplicateCheck(phoneResult.normalized);
 
   function handlePlanChange(id: string) {
-    setPlanId(id)
+    setPlanId(id);
 
-    const plan = plans?.find((p) => p.id === id)
+    const plan = plans?.find((p) => p.id === id);
 
     if (plan) {
-      if (plan.duration_days) setDurationDays(plan.duration_days)
-      setGrossAmount(Number(plan.default_price))
+      if (plan.duration_days) setDurationDays(plan.duration_days);
+      setGrossAmount(Number(plan.default_price));
     }
   }
 
   function resetForm() {
-    setFullName('')
-    setPhoneInput('')
-    setEmergencyName('')
-    setEmergencyPhone('')
-    setPlanId('')
-    setDurationDays(30)
-    setGrossAmount(0)
-    setDiscountAmount(0)
-    setInitialPayment('')
-    setPaymentMethod('cash')
-    setError(null)
+    setFullName("");
+    setPhoneInput("");
+    setEmergencyName("");
+    setEmergencyPhone("");
+    setPlanId("");
+    setDurationDays(30);
+    setGrossAmount(0);
+    setDiscountAmount(0);
+    setInitialPayment("");
+    setPaymentMethod("cash");
+    setError(null);
   }
 
   async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    setError(null)
+    e.preventDefault();
+    setError(null);
 
     if (!fullName.trim()) {
-      setError('Full name is required')
-      return
+      setError("Full name is required");
+      return;
     }
 
     if (!phoneResult.valid || !phoneResult.normalized) {
-      setError('Enter a valid phone number')
-      return
+      setError("Enter a valid phone number");
+      return;
     }
 
     if (durationDays < 1) {
-      setError('Membership duration must be at least 1 day')
-      return
+      setError("Membership duration must be at least 1 day");
+      return;
     }
 
     if (grossAmount < 0 || discountAmount < 0) {
-      setError('Amounts cannot be negative')
-      return
+      setError("Amounts cannot be negative");
+      return;
     }
 
     if (discountAmount > grossAmount) {
-      setError('Discount cannot exceed the membership price')
-      return
+      setError("Discount cannot exceed the membership price");
+      return;
     }
 
-    const netAmount = grossAmount - discountAmount
+    const netAmount = grossAmount - discountAmount;
 
     if (initialPayment && Number(initialPayment) > netAmount) {
-      setError('Initial payment cannot exceed the amount due')
-      return
+      setError("Initial payment cannot exceed the amount due");
+      return;
     }
 
     if (initialPayment && Number(initialPayment) < 0) {
-      setError('Initial payment cannot be negative')
-      return
+      setError("Initial payment cannot be negative");
+      return;
     }
 
     try {
-      const today = new Date().toLocaleDateString('en-CA')
+      const today = new Date().toLocaleDateString("en-CA");
 
       await registerMember.mutateAsync({
         full_name: fullName.trim(),
@@ -111,36 +112,34 @@ export function MemberFormModal({
         joining_date: today,
         plan_id: planId || null,
         plan_name_snapshot:
-          plans?.find((p) => p.id === planId)?.name ?? 'Custom',
+          plans?.find((p) => p.id === planId)?.name ?? "Custom",
         duration_days: durationDays,
         start_date: today,
         gross_amount: grossAmount,
         discount_amount: discountAmount,
         initial_payment_amount:
-          initialPayment !== '' ? Number(initialPayment) : null,
-        initial_payment_method:
-          initialPayment !== '' ? paymentMethod : null,
-      })
+          initialPayment !== "" ? Number(initialPayment) : null,
+        initial_payment_method: initialPayment !== "" ? paymentMethod : null,
+      });
 
-      resetForm()
-      onClose()
+      resetForm();
+      onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setError(err instanceof Error ? err.message : "Something went wrong");
     }
   }
 
-  const activeDuplicates = duplicates?.filter((d) => !d.is_deleted) ?? []
-  const deletedDuplicates = duplicates?.filter((d) => d.is_deleted) ?? []
+  const activeDuplicates = duplicates?.filter((d) => !d.is_deleted) ?? [];
+  const deletedDuplicates = duplicates?.filter((d) => d.is_deleted) ?? [];
 
-  const netAmount = grossAmount - discountAmount
+  const netAmount = grossAmount - discountAmount;
 
-  const inputClass = 'member-input'
-  const labelClass = 'member-label'
+  const inputClass = "member-input";
+  const labelClass = "member-label";
 
   return (
     <Modal open={open} onClose={onClose} title="Add member">
       <form onSubmit={handleSubmit} className="member-form">
-
         {/* Member information */}
         <div className="member-form__section">
           <div className="member-form__section-heading">
@@ -181,9 +180,9 @@ export function MemberFormModal({
                 <div className="member-warning">
                   <span className="member-warning__icon">!</span>
                   <p>
-                    This number already belongs to{' '}
+                    This number already belongs to{" "}
                     <strong>
-                      {activeDuplicates.map((d) => d.full_name).join(', ')}
+                      {activeDuplicates.map((d) => d.full_name).join(", ")}
                     </strong>
                     . You can still continue if this is intentional.
                   </p>
@@ -192,8 +191,8 @@ export function MemberFormModal({
 
               {deletedDuplicates.length > 0 && (
                 <p className="member-field__hint">
-                  Previously deleted record found:{' '}
-                  {deletedDuplicates.map((d) => d.full_name).join(', ')}
+                  Previously deleted record found:{" "}
+                  {deletedDuplicates.map((d) => d.full_name).join(", ")}
                 </p>
               )}
             </div>
@@ -293,7 +292,7 @@ export function MemberFormModal({
             </div>
           </div>
 
-          {initialPayment !== '' && Number(initialPayment) > 0 && (
+          {initialPayment !== "" && Number(initialPayment) > 0 && (
             <div className="member-field member-field--payment-method">
               <label className={labelClass}>Payment method</label>
               <select
@@ -316,12 +315,15 @@ export function MemberFormModal({
             </div>
             <div>
               <span>Initial payment</span>
-              <strong>Rs. {(Number(initialPayment) || 0).toLocaleString()}</strong>
+              <strong>
+                Rs. {(Number(initialPayment) || 0).toLocaleString()}
+              </strong>
             </div>
             <div>
               <span>Remaining balance</span>
               <strong className="member-summary__balance">
-                Rs. {(netAmount - (Number(initialPayment) || 0)).toLocaleString()}
+                Rs.{" "}
+                {(netAmount - (Number(initialPayment) || 0)).toLocaleString()}
               </strong>
             </div>
           </div>
@@ -356,13 +358,14 @@ export function MemberFormModal({
               </>
             ) : (
               <>
+                <UserPlus size={16} />
                 Create member
-                <span>↗</span>
+                {/* <span>↗</span> */}
               </>
             )}
           </button>
         </div>
       </form>
     </Modal>
-  )
+  );
 }
