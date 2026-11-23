@@ -42,8 +42,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       Math.max(y, window.innerHeight - y),
     )
 
-    // @ts-expect-error — not yet in all TS lib.dom versions
-    const transition = document.startViewTransition(() => setTheme(next))
+    const transition = (document as unknown as { startViewTransition: (cb: () => void) => { ready: Promise<void> } }).startViewTransition(() => setTheme(next))
 
     transition.ready.then(() => {
       document.documentElement.animate(

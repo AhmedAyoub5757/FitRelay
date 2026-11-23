@@ -12,7 +12,7 @@ interface ModalProps {
 export function Modal({ open, onClose, title, children }: ModalProps) {
   const [visible, setVisible] = useState(open)
   const [closing, setClosing] = useState(false)
-  const modalPanelRef = useRef<HTMLElement>(null)
+  const modalPanelRef = useRef<HTMLDivElement>(null)
   const triggerElementRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {

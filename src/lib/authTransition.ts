@@ -11,6 +11,5 @@ export function transitionNavigate(navigate: NavigateFunction, to: string) {
     navigate(to)
     return
   }
-  // @ts-expect-error — startViewTransition not yet in all TS lib.dom versions
-  document.startViewTransition(() => navigate(to))
+  ;(document as unknown as { startViewTransition: (cb: () => void) => void }).startViewTransition(() => navigate(to))
 }

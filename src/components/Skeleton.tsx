@@ -1,5 +1,3 @@
-import type { ReactNode } from 'react'
-
 /** Animated placeholder block */
 function SkeletonBlock({ className = '' }: { className?: string }) {
   return <div className={`skeleton ${className}`} aria-hidden="true" />

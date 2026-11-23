@@ -216,7 +216,7 @@ function RecordPaymentModal({ open, onClose }: { open: boolean; onClose: () => v
   const [error, setError] = useState<string | null>(null)
   const debouncedSearch = useDebounce(search, 280)
 
-  const { data: members } = useMembers(debouncedSearch, undefined)
+  const { data: members } = useMembers(debouncedSearch, 'all')
   const recordPayment = useRecordGymPayment()
   const toast = useToast()
 

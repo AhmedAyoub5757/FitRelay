@@ -155,7 +155,7 @@ function PlanModal({
   )
   const [error, setError] = useState<string | null>(null)
 
-  const createPlan = useCreatePlan()
+  const createPlan = useCreatePlan(gymId)
   const updatePlan = useUpdatePlan()
   const isEditing = !!editingPlan
   const toast = useToast()
@@ -184,7 +184,6 @@ function PlanModal({
           return
         }
         await createPlan.mutateAsync({
-          gymId,
           name,
           durationDays: days,
           defaultPrice: price,

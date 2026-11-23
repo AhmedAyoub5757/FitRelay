@@ -17,7 +17,9 @@ export function useMemberStatusCounts() {
       const { data, error } = await supabase.from('member_status').select('status')
       if (error) throw error
       const counts: Record<string, number> = {}
-      for (const row of data) counts[row.status] = (counts[row.status] ?? 0) + 1
+      for (const row of data) {
+        if (row.status) counts[row.status] = (counts[row.status] ?? 0) + 1
+      }
       return counts
     },
   })
