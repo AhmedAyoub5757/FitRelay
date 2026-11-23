@@ -1,6 +1,7 @@
 import { useState, useMemo, type FormEvent } from "react";
 import { Modal } from "../../components/Modal";
 import { normalizePhone } from "../../lib/phone";
+import { useToast } from "../../context/ToastContext";
 import {
   useMembershipPlans,
   useDuplicateCheck,
@@ -29,6 +30,7 @@ export function MemberFormModal({
 
   const { data: plans } = useMembershipPlans();
   const registerMember = useRegisterMember();
+  const toast = useToast();
 
   const phoneResult = useMemo(() => normalizePhone(phoneInput), [phoneInput]);
 
@@ -123,9 +125,12 @@ export function MemberFormModal({
       });
 
       resetForm();
+      toast.success("Member registered successfully!");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setError(msg);
+      toast.error(msg);
     }
   }
 

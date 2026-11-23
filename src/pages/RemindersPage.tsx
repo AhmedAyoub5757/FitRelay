@@ -1,6 +1,14 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useReminders, useMarkReminderSent, type ReminderStatusFilter } from '../features/reminders/queries'
+import { Pagination, usePagination } from '../components/Pagination'
+import { SkeletonTable } from '../components/Skeleton'
+import { EmptyState } from '../components/EmptyState'
+import { useToast } from '../context/ToastContext'
+import { formatCurrency } from '../lib/formatCurrency'
+import { formatDate } from '../lib/formatDate'
+import { Spinner } from '../components/Spinner'
+import { Bell } from 'lucide-react'
 
 const STAGE_LABELS: Record<string, string> = {
   '7_days_before': 'Expires in 7 days',
@@ -14,20 +22,36 @@ function buildWhatsAppLink(phoneNormalized: string, message: string) {
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
 }
 
+const PAGE_SIZE = 10
+
 export default function RemindersPage() {
   const [status, setStatus] = useState<ReminderStatusFilter>('pending')
+  const [page, setPage] = useState(1)
+  const tableRef = useRef<HTMLDivElement>(null)
+
   const { data: reminders, isLoading } = useReminders(status)
   const markSent = useMarkReminderSent()
+  const toast = useToast()
+
+  useEffect(() => { setPage(1) }, [status])
+  useEffect(() => { tableRef.current?.scrollTo({ top: 0, behavior: 'smooth' }) }, [page])
+
+  const paged = usePagination(reminders ?? [], PAGE_SIZE, page)
+
+  const emptyMessages: Record<string, string> = {
+    pending: 'No pending reminders — you\'re all caught up!',
+    owner_confirmed_sent: 'No sent reminders in this filter.',
+    resolved: 'No resolved reminders yet.',
+    all: 'No reminders found.',
+  }
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-display text-3xl tracking-wide">Reminders</h1>
+    <div className="page-container space-y-6">
+      <h1 className="page-title">Reminders</h1>
 
-      <div className="flex gap-2">
-        {(['pending', 'owner_confirmed_sent', 'resolved', 'all'] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatus(s)}
+      <div className="flex gap-2 flex-wrap">
+        {(['pending', 'owner_confirmed_sent', 'resolved', 'all'] as const).map(s => (
+          <button key={s} onClick={() => setStatus(s)}
             className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
               status === s ? 'bg-accent text-white' : 'border border-border text-muted hover:text-foreground'
             }`}
@@ -37,60 +61,73 @@ export default function RemindersPage() {
         ))}
       </div>
 
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-border text-left text-muted">
-            <th className="py-2 pr-4 font-medium">Member</th>
-            <th className="py-2 pr-4 font-medium">Reason</th>
-            <th className="py-2 pr-4 font-medium">Scheduled</th>
-            <th className="py-2 pr-4 font-medium">Message</th>
-            <th className="py-2 pr-4 font-medium"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {isLoading && (
-            <tr><td colSpan={5} className="py-4 text-center text-muted">Loading...</td></tr>
-          )}
-          {!isLoading && reminders?.length === 0 && (
-            <tr><td colSpan={5} className="py-4 text-center text-muted">Nothing here.</td></tr>
-          )}
-          {reminders?.map((r) => (
-            <tr key={r.id} className="border-b border-border align-top">
-              <td className="py-2 pr-4">
-                <Link to={`/app/members/${r.member.id}`} className="hover:underline">{r.member.full_name}</Link>
-              </td>
-              <td className="py-2 pr-4">
-                {r.category === 'payment_due'
-                  ? `Payment due${r.amount_snapshot ? ` (${Number(r.amount_snapshot).toFixed(2)})` : ''}`
-                  : STAGE_LABELS[r.reminder_stage ?? ''] ?? r.reminder_stage}
-              </td>
-              <td className="py-2 pr-4 text-muted">{r.scheduled_for}</td>
-              <td className="max-w-xs py-2 pr-4 text-muted">{r.message_snapshot}</td>
-              <td className="py-2 pr-4">
-                <div className="flex gap-2">
-                  <a
-                    href={buildWhatsAppLink(r.member.phone_normalized, r.message_snapshot ?? '')}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface"
-                  >
-                    WhatsApp
-                  </a>
-                  {r.status === 'pending' && (
-                    <button
-                      onClick={() => markSent.mutate(r.id)}
-                      disabled={markSent.isPending}
-                      className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-                    >
-                      Mark sent
-                    </button>
-                  )}
-                </div>
-              </td>
+      <div ref={tableRef} className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th>Reason</th>
+              <th>Scheduled</th>
+              <th>Message</th>
+              <th></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {isLoading && <SkeletonTable rows={6} cols={5} />}
+            {!isLoading && paged.map(r => (
+              <tr key={r.id} className="align-top">
+                <td>
+                  <Link to={`/app/members/${r.member.id}`} className="table-link">{r.member.full_name}</Link>
+                </td>
+                <td>
+                  {r.category === 'payment_due'
+                    ? `Payment due${r.amount_snapshot ? ` (${formatCurrency(r.amount_snapshot)})` : ''}`
+                    : STAGE_LABELS[r.reminder_stage ?? ''] ?? r.reminder_stage}
+                </td>
+                <td className="text-muted">{formatDate(r.scheduled_for)}</td>
+                <td className="max-w-xs text-muted">{r.message_snapshot}</td>
+                <td>
+                  <div className="flex gap-2">
+                    <a
+                      href={buildWhatsAppLink(r.member.phone_normalized, r.message_snapshot ?? '')}
+                      target="_blank" rel="noreferrer"
+                      className="rounded border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface text-foreground transition-colors"
+                    >
+                      WhatsApp
+                    </a>
+                    {r.status === 'pending' && (
+                      <button
+                        onClick={() =>
+                          markSent.mutate(r.id, {
+                            onSuccess: () => toast.success('Reminder marked as sent'),
+                            onError: (err) =>
+                              toast.error(err instanceof Error ? err.message : 'Failed to update reminder'),
+                          })
+                        }
+                        disabled={markSent.isPending}
+                        className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 inline-flex items-center justify-center min-w-[75px]"
+                      >
+                        {markSent.isPending ? <Spinner size={12} label="Updating..." /> : 'Mark sent'}
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {!isLoading && (reminders?.length ?? 0) === 0 && (
+          <EmptyState
+            icon={<Bell size={32} />}
+            title={emptyMessages[status] ?? 'No reminders found.'}
+          />
+        )}
+      </div>
+
+      {!isLoading && (reminders?.length ?? 0) > 0 && (
+        <Pagination page={page} pageSize={PAGE_SIZE} total={reminders?.length ?? 0} onPage={setPage} />
+      )}
     </div>
   )
 }

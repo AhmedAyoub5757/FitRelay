@@ -15,7 +15,13 @@ import {
   useUnfreezeMembership,
   useRenewMembership,
 } from "../features/members/detailQueries";
-import { ArrowLeft } from "lucide-react";
+import { SkeletonDetailHeader, SkeletonCard, SkeletonTable, SkeletonModalBody } from "../components/Skeleton";
+import { EmptyState } from "../components/EmptyState";
+import { useToast } from "../context/ToastContext";
+import { formatCurrency } from "../lib/formatCurrency";
+import { formatDate } from "../lib/formatDate";
+import { Spinner } from "../components/Spinner";
+import { ArrowLeft, CreditCard, Calendar } from "lucide-react";
 
 export default function MemberDetailPage() {
   const { memberId } = useParams<{ memberId: string }>();
@@ -34,8 +40,41 @@ export default function MemberDetailPage() {
   const { data: credit } = useCreditBalance(memberId!);
 
   if (!memberId) return null;
-  if (memberLoading || membershipsLoading)
-    return <p className="text-sm text-muted">Loading...</p>;
+
+  if (memberLoading || membershipsLoading) {
+    return (
+      <div className="page-container space-y-6">
+        <Link
+          to="/app/members"
+          className="group inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors duration-150 hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4 transition-transform duration-200 ease-out group-hover:-translate-x-1" />
+          Back to members
+        </Link>
+        <SkeletonDetailHeader />
+        <div className="grid grid-cols-2 gap-4">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Plan</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <SkeletonTable rows={3} cols={4} />
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   if (!member) return <p className="text-sm text-danger">Member not found.</p>;
 
   const latest = memberships?.[0] ?? null;
@@ -45,7 +84,7 @@ export default function MemberDetailPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="page-container space-y-6">
       <Link
         to="/app/members"
         className="group inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors duration-150 hover:text-foreground"
@@ -56,7 +95,7 @@ export default function MemberDetailPage() {
 
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="font-display text-3xl tracking-wide">
+          <h1 className="page-title">
             {member.full_name}
           </h1>
           <p className="mt-1 text-sm text-muted">{member.phone}</p>
@@ -70,20 +109,20 @@ export default function MemberDetailPage() {
         {status && <StatusBadge status={status} />}
       </div>
 
-      <div className="flex gap-6 rounded border border-border p-4">
+      <div className="flex gap-6 rounded-xl border border-border bg-surface/30 p-4">
         <div>
           <p className="text-xs text-muted">Outstanding balance</p>
           <p
             className={`font-display text-2xl ${totalOutstanding > 0 ? "text-danger" : "text-success"}`}
           >
-            {totalOutstanding.toFixed(2)}
+            {formatCurrency(totalOutstanding)}
           </p>
         </div>
         {credit != null && credit > 0 && (
           <div>
             <p className="text-xs text-muted">Available credit</p>
             <p className="font-display text-2xl text-accent">
-              {credit.toFixed(2)}
+              {formatCurrency(credit)}
             </p>
           </div>
         )}
@@ -92,14 +131,14 @@ export default function MemberDetailPage() {
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setPaymentModalOpen(true)}
-          className="rounded bg-accent px-4 py-2 text-sm font-medium text-white"
+          className="btn-primary"
         >
           Record payment
         </button>
         {latest?.status === "active" && (
           <button
             onClick={() => setFreezeModalOpen(true)}
-            className="rounded border border-border px-4 py-2 text-sm font-medium"
+            className="rounded border border-border px-4 py-2 text-sm font-medium hover:bg-surface"
           >
             Freeze membership
           </button>
@@ -107,7 +146,7 @@ export default function MemberDetailPage() {
         {latest?.status === "frozen" && (
           <button
             onClick={() => setUnfreezeModalOpen(true)}
-            className="rounded border border-border px-4 py-2 text-sm font-medium"
+            className="rounded border border-border px-4 py-2 text-sm font-medium hover:bg-surface"
           >
             Unfreeze membership
           </button>
@@ -115,7 +154,7 @@ export default function MemberDetailPage() {
         {latest && ["active", "frozen", "expired"].includes(latest.status) && (
           <button
             onClick={() => setRenewModalOpen(true)}
-            className="rounded border border-border px-4 py-2 text-sm font-medium"
+            className="rounded border border-border px-4 py-2 text-sm font-medium hover:bg-surface"
           >
             Renew
           </button>
@@ -123,75 +162,86 @@ export default function MemberDetailPage() {
       </div>
 
       <section>
-        <h2 className="mb-2 font-display text-xl tracking-wide">
+        <h2 className="section-title mb-2">
           Membership history
         </h2>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-muted">
-              <th className="py-2 pr-4 font-medium">Plan</th>
-              <th className="py-2 pr-4 font-medium">Start</th>
-              <th className="py-2 pr-4 font-medium">End</th>
-              <th className="py-2 pr-4 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {memberships?.map((m) => (
-              <tr key={m.id} className="border-b border-border">
-                <td className="py-2 pr-4">{m.plan_name_snapshot}</td>
-                <td className="py-2 pr-4 text-muted">{m.start_date}</td>
-                <td className="py-2 pr-4 text-muted">{m.end_date}</td>
-                <td className="py-2 pr-4">
-                  <StatusBadge status={m.status} />
-                </td>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Plan</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {memberships?.map((m) => (
+                <tr key={m.id}>
+                  <td className="font-medium text-foreground">{m.plan_name_snapshot}</td>
+                  <td className="text-muted">{formatDate(m.start_date)}</td>
+                  <td className="text-muted">{formatDate(m.end_date)}</td>
+                  <td>
+                    <StatusBadge status={m.status} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {memberships?.length === 0 && (
+            <EmptyState
+              icon={<Calendar size={28} />}
+              title="No memberships recorded"
+              description="Renew or assign a membership to this member."
+            />
+          )}
+        </div>
       </section>
 
       <section>
-        <h2 className="mb-2 font-display text-xl tracking-wide">
+        <h2 className="section-title mb-2">
           Payment history
         </h2>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-muted">
-              <th className="py-2 pr-4 font-medium">Date</th>
-              <th className="py-2 pr-4 font-medium">Type</th>
-              <th className="py-2 pr-4 font-medium">Amount</th>
-              <th className="py-2 pr-4 font-medium">Method</th>
-              <th className="py-2 pr-4 font-medium">Receipt #</th>
-            </tr>
-          </thead>
-          <tbody>
-            {payments?.map((p) => (
-              <tr key={p.id} className="border-b border-border">
-                <td className="py-2 pr-4 text-muted">
-                  {new Date(p.created_at).toLocaleDateString()}
-                </td>
-                <td className="py-2 pr-4">
-                  {p.entry_type === "refund" ? "Refund" : "Payment"}
-                </td>
-                <td
-                  className={`py-2 pr-4 ${p.entry_type === "refund" ? "text-danger" : "text-success"}`}
-                >
-                  {p.entry_type === "refund" ? "-" : ""}
-                  {Number(p.amount).toFixed(2)}
-                </td>
-                <td className="py-2 pr-4 text-muted">{p.payment_method}</td>
-                <td className="py-2 pr-4 text-muted">#{p.receipt_number}</td>
-              </tr>
-            ))}
-            {payments?.length === 0 && (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
               <tr>
-                <td colSpan={5} className="py-4 text-center text-muted">
-                  No payments recorded yet.
-                </td>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Method</th>
+                <th>Receipt #</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {payments?.map((p) => (
+                <tr key={p.id}>
+                  <td className="text-muted">
+                    {formatDate(p.created_at)}
+                  </td>
+                  <td>
+                    {p.entry_type === "refund" ? "Refund" : "Payment"}
+                  </td>
+                  <td
+                    className={p.entry_type === "refund" ? "text-danger font-medium" : "text-success font-medium"}
+                  >
+                    {p.entry_type === "refund" ? "-" : ""}
+                    {formatCurrency(p.amount)}
+                  </td>
+                  <td className="text-muted capitalize">{p.payment_method?.replace('_', ' ')}</td>
+                  <td className="text-muted">#{p.receipt_number}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {payments?.length === 0 && (
+            <EmptyState
+              icon={<CreditCard size={28} />}
+              title="No payments recorded yet"
+              description="Record a payment when the member settles their dues."
+            />
+          )}
+        </div>
       </section>
 
       <RecordPaymentModal
@@ -240,16 +290,20 @@ function RecordPaymentModal({
   const [method, setMethod] = useState("cash");
   const [error, setError] = useState<string | null>(null);
   const recordPayment = useRecordPayment(memberId);
+  const toast = useToast();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     try {
       await recordPayment.mutateAsync({ amount: Number(amount), method });
+      toast.success("Payment recorded successfully");
       setAmount("");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -266,7 +320,7 @@ function RecordPaymentModal({
             step="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="mt-1 w-full rounded border border-border bg-background px-3 py-2"
+            className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm"
           />
         </div>
         <div>
@@ -274,7 +328,7 @@ function RecordPaymentModal({
           <select
             value={method}
             onChange={(e) => setMethod(e.target.value)}
-            className="mt-1 w-full rounded border border-border bg-background px-3 py-2"
+            className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm"
           >
             <option value="cash">Cash</option>
             <option value="bank_transfer">Bank transfer</option>
@@ -288,9 +342,9 @@ function RecordPaymentModal({
         <button
           type="submit"
           disabled={recordPayment.isPending}
-          className="w-full rounded bg-accent py-2 font-medium text-white disabled:opacity-50"
+          className="btn-primary w-full justify-center disabled:opacity-50"
         >
-          {recordPayment.isPending ? "Recording..." : "Record payment"}
+          {recordPayment.isPending ? <Spinner size={14} label="Recording payment..." /> : "Record payment"}
         </button>
       </form>
     </Modal>
@@ -313,15 +367,19 @@ function FreezeModal({
   );
   const [error, setError] = useState<string | null>(null);
   const freeze = useFreezeMembership(memberId);
+  const toast = useToast();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     try {
       await freeze.mutateAsync({ membershipId, startDate });
+      toast.success("Membership frozen successfully");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -336,15 +394,15 @@ function FreezeModal({
             required
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="mt-1 w-full rounded border border-border bg-background px-3 py-2"
+            className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm"
           />
         </div>
         <button
           type="submit"
           disabled={freeze.isPending}
-          className="w-full rounded bg-accent py-2 font-medium text-white disabled:opacity-50"
+          className="btn-primary w-full justify-center disabled:opacity-50"
         >
-          {freeze.isPending ? "Freezing..." : "Freeze"}
+          {freeze.isPending ? <Spinner size={14} label="Freezing..." /> : "Freeze"}
         </button>
       </form>
     </Modal>
@@ -365,15 +423,19 @@ function UnfreezeModal({
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
   const [error, setError] = useState<string | null>(null);
   const unfreeze = useUnfreezeMembership(memberId);
+  const toast = useToast();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     try {
       await unfreeze.mutateAsync({ freezeId, endDate });
+      toast.success("Membership reactivated successfully");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -388,15 +450,15 @@ function UnfreezeModal({
             required
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="mt-1 w-full rounded border border-border bg-background px-3 py-2"
+            className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm"
           />
         </div>
         <button
           type="submit"
           disabled={unfreeze.isPending}
-          className="w-full rounded bg-accent py-2 font-medium text-white disabled:opacity-50"
+          className="btn-primary w-full justify-center disabled:opacity-50"
         >
-          {unfreeze.isPending ? "Unfreezing..." : "Unfreeze"}
+          {unfreeze.isPending ? <Spinner size={14} label="Unfreezing..." /> : "Unfreeze"}
         </button>
       </form>
     </Modal>
@@ -420,8 +482,9 @@ function RenewModal({
   const [discountAmount, setDiscountAmount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: plans } = useMembershipPlans();
+  const { data: plans, isLoading: plansLoading } = useMembershipPlans();
   const renew = useRenewMembership(memberId);
+  const toast = useToast();
 
   function handlePlanChange(id: string) {
     setPlanId(id);
@@ -444,73 +507,80 @@ function RenewModal({
         grossAmount,
         discountAmount,
       });
+      toast.success("Membership renewed successfully");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setError(msg);
+      toast.error(msg);
     }
   }
 
   return (
     <Modal open={open} onClose={onClose} title="Renew membership">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <p className="text-sm text-danger">{error}</p>}
-        <div>
-          <label className="block text-sm font-medium">Plan</label>
-          <select
-            value={planId}
-            onChange={(e) => handlePlanChange(e.target.value)}
-            className="mt-1 w-full rounded border border-border bg-background px-3 py-2"
+      {plansLoading ? (
+        <SkeletonModalBody rows={3} />
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && <p className="text-sm text-danger">{error}</p>}
+          <div>
+            <label className="block text-sm font-medium">Plan</label>
+            <select
+              value={planId}
+              onChange={(e) => handlePlanChange(e.target.value)}
+              className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="">Custom</option>
+              {plans?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium">Duration (days)</label>
+              <input
+                type="number"
+                required
+                min={1}
+                value={durationDays}
+                onChange={(e) => setDurationDays(Number(e.target.value))}
+                className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Price</label>
+              <input
+                type="number"
+                required
+                min={0}
+                value={grossAmount}
+                onChange={(e) => setGrossAmount(Number(e.target.value))}
+                className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Discount</label>
+              <input
+                type="number"
+                min={0}
+                value={discountAmount}
+                onChange={(e) => setDiscountAmount(Number(e.target.value))}
+                className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={renew.isPending}
+            className="btn-primary w-full justify-center disabled:opacity-50"
           >
-            <option value="">Custom</option>
-            {plans?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="block text-sm font-medium">Duration (days)</label>
-            <input
-              type="number"
-              required
-              min={1}
-              value={durationDays}
-              onChange={(e) => setDurationDays(Number(e.target.value))}
-              className="mt-1 w-full rounded border border-border bg-background px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Price</label>
-            <input
-              type="number"
-              required
-              min={0}
-              value={grossAmount}
-              onChange={(e) => setGrossAmount(Number(e.target.value))}
-              className="mt-1 w-full rounded border border-border bg-background px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Discount</label>
-            <input
-              type="number"
-              min={0}
-              value={discountAmount}
-              onChange={(e) => setDiscountAmount(Number(e.target.value))}
-              className="mt-1 w-full rounded border border-border bg-background px-3 py-2"
-            />
-          </div>
-        </div>
-        <button
-          type="submit"
-          disabled={renew.isPending}
-          className="w-full rounded bg-accent py-2 font-medium text-white disabled:opacity-50"
-        >
-          {renew.isPending ? "Renewing..." : "Renew"}
-        </button>
-      </form>
+            {renew.isPending ? <Spinner size={14} label="Renewing..." /> : "Renew"}
+          </button>
+        </form>
+      )}
     </Modal>
   );
 }

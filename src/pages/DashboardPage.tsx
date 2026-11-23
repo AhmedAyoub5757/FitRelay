@@ -1,64 +1,112 @@
-import { Link } from 'react-router-dom'
-import { ArrowRight } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { ArrowRight, Clock } from 'lucide-react'
+import { formatDate } from '../lib/formatDate'
 import {
   useMemberStatusCounts, useGymOutstandingTotal, useTodaysCollections,
   usePendingReminderCount, useExpiringSoon,
 } from '../features/dashboard/queries'
+import { SkeletonCard, SkeletonTable } from '../components/Skeleton'
+import { EmptyState } from '../components/EmptyState'
+import { CountUp } from '../components/CountUp'
+import type { ReactNode } from 'react'
 
-function StatCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function StatCard({
+  label, value, accent, loading,
+}: { label: string; value: ReactNode; accent?: boolean; loading?: boolean }) {
+  if (loading) return <SkeletonCard />
   return (
-    <div className="rounded border border-border p-4">
-      <p className="text-xs text-muted">{label}</p>
-      <p className={`font-display text-3xl ${accent ? 'text-accent' : ''}`}>{value}</p>
+    <div className="stat-card">
+      <p className="stat-card__label">{label}</p>
+      <p className={`stat-card__value font-display${accent ? ' text-accent' : ''}`}>{value}</p>
     </div>
   )
 }
 
 export default function DashboardPage() {
-  const { data: counts } = useMemberStatusCounts()
-  const { data: outstanding } = useGymOutstandingTotal()
-  const { data: collections } = useTodaysCollections()
-  const { data: pendingReminders } = usePendingReminderCount()
-  const { data: expiringSoon } = useExpiringSoon()
+  const navigate = useNavigate()
+  const { data: counts,     isLoading: loadCounts }  = useMemberStatusCounts()
+  const { data: outstanding, isLoading: loadOut }     = useGymOutstandingTotal()
+  const { data: collections, isLoading: loadColl }    = useTodaysCollections()
+  const { data: pendingReminders, isLoading: loadReminders } = usePendingReminderCount()
+  const { data: expiringSoon, isLoading: loadExpiry } = useExpiringSoon()
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-display text-3xl tracking-wide">Dashboard</h1>
+    <div className="space-y-8">
+      <h1 className="page-title">Dashboard</h1>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="Active members" value={String(counts?.active ?? 0)} />
-        <StatCard label="Frozen" value={String(counts?.frozen ?? 0)} />
-        <StatCard label="Expired" value={String(counts?.expired ?? 0)} />
-        <StatCard label="Outstanding (gym-wide)" value={outstanding != null ? outstanding.toFixed(2) : '—'} accent />
-        <StatCard label="Collected today" value={collections != null ? collections.toFixed(2) : '—'} />
-        <StatCard label="Pending reminders" value={String(pendingReminders ?? 0)} />
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <StatCard
+          label="Active members"
+          loading={loadCounts}
+          value={counts?.active != null ? <CountUp value={counts.active} /> : '0'}
+        />
+        <StatCard
+          label="Frozen"
+          loading={loadCounts}
+          value={counts?.frozen != null ? <CountUp value={counts.frozen} /> : '0'}
+        />
+        <StatCard
+          label="Expired"
+          loading={loadCounts}
+          value={counts?.expired != null ? <CountUp value={counts.expired} /> : '0'}
+        />
+        <StatCard
+          label="Outstanding"
+          accent
+          loading={loadOut}
+          value={outstanding != null ? <CountUp value={outstanding} decimals={2} prefix="Rs. " /> : '—'}
+        />
+        <StatCard
+          label="Collected today"
+          loading={loadColl}
+          value={collections != null ? <CountUp value={collections} decimals={2} prefix="Rs. " /> : '—'}
+        />
+        <StatCard
+          label="Pending reminders"
+          loading={loadReminders}
+          value={pendingReminders != null ? <CountUp value={pendingReminders} /> : '0'}
+        />
       </div>
 
       <section>
-        <h2 className="mb-2 font-display text-xl tracking-wide">Expiring in the next 7 days</h2>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-muted">
-              <th className="py-2 pr-4 font-medium">Member</th>
-              <th className="py-2 pr-4 font-medium">Plan</th>
-              <th className="py-2 pr-4 font-medium">End date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {expiringSoon?.length === 0 && (
-              <tr><td colSpan={3} className="py-4 text-center text-muted">Nothing expiring soon.</td></tr>
-            )}
-            {expiringSoon?.map((m) => (
-              <tr key={m.id} className="border-b border-border">
-                <td className="py-2 pr-4">
-                  <Link to={`/app/members/${m.member.id}`} className="hover:underline">{m.member.full_name}</Link>
-                </td>
-                <td className="py-2 pr-4 text-muted">{m.plan_name_snapshot}</td>
-                <td className="py-2 pr-4 text-muted">{m.end_date}</td>
+        <h2 className="section-title">Expiring in the next 7 days</h2>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Plan</th>
+                <th>End date</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loadExpiry && <SkeletonTable rows={4} cols={3} />}
+              {!loadExpiry && (expiringSoon ?? []).map(m => (
+                <tr
+                  key={m.id}
+                  onClick={() => navigate(`/app/members/${m.member.id}`)}
+                  tabIndex={0}
+                  role="link"
+                  className="cursor-pointer hover:bg-surface/70 transition-colors focus-visible:outline-none focus-visible:bg-surface"
+                  aria-label={`View member ${m.member.full_name}`}
+                >
+                  <td>
+                    <span className="table-link font-semibold text-foreground">{m.member.full_name}</span>
+                  </td>
+                  <td className="text-muted">{m.plan_name_snapshot}</td>
+                  <td className="text-muted">{formatDate(m.end_date)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!loadExpiry && (expiringSoon?.length ?? 0) === 0 && (
+            <EmptyState
+              icon={<Clock size={28} />}
+              title="No memberships expiring in the next 7 days"
+              description="Check back here as renewal time approaches."
+            />
+          )}
+        </div>
       </section>
 
       <Link to="/app/reminders" className="group inline-flex items-center gap-1.5 text-sm font-medium text-accent">
